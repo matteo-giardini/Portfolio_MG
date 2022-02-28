@@ -1,0 +1,1430 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "id": "1_t4V9bnt-hB",
+    "nbgrader": {
+     "cell_type": "markdown",
+     "checksum": "6e191ff034c9e24a9131806d3c85022e",
+     "grade": false,
+     "grade_id": "cell-e911fa75d4ae6ea9",
+     "locked": true,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "source": [
+    "\n",
+    "# Assignment 2: Creating a better alternative to COMPAS\n",
+    "\n",
+    "This notebook contains a set of exercises that will guide you through the different steps of this assignment. Solutions need to be code-based, _i.e._ hard-coded or manually computed results will not be accepted. Remember to write your solutions to each exercise in the dedicated cells and to not modify the test cells. When you are done completing all the exercises submit this same notebook back to moodle in **.ipynb** format.\n",
+    "\n",
+    "<div class=\"alert alert-success\">\n",
+    "\n",
+    "In the previous notebook, you created a simple pipeline for predicting the severity of possible re-incidences of two years worth of the COMPAS scores from the Broward County Sheriff’s Office in Florida. In this notebook, you will improve it by performing hyper-parameters optimization. To this aim, you will use the same dataset with the information for all 18,610 people who were scored by this software in 2013 and 2014.\n",
+    "    \n",
+    "</div>\n",
+    "\n",
+    "<div class=\"alert alert-danger\"><b>Submission deadline:</b> Sunday, February 20th, 23:55</div>\n",
+    "\n",
+    "<div class=\"alert alert-warning\">\n",
+    "    \n",
+    "The goal of this notebook is not to create another pre-processing routine. Execute the following cell for creating an initial SciKit-learn ColumnTransformer. The proposed transformer is not perfect, but it will allow you to perform all the exercises without warnings.\n",
+    "    \n",
+    "**Carefully** read the different pre-processing steps, later read their documentation. The assignment exercises require some **understanding** of these data pre-preprocessing steps.\n",
+    "</div>"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "id": "1gbj1gyT16vl",
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "d570714c0b1baab77f89e7951e06bcca",
+     "grade": false,
+     "grade_id": "cell-0fcbc57512e78927",
+     "locked": true,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "outputs": [],
+   "source": [
+    "import pandas as pd\n",
+    "from sklearn.compose import ColumnTransformer\n",
+    "from sklearn.preprocessing import OneHotEncoder\n",
+    "from sklearn.preprocessing import KBinsDiscretizer\n",
+    "from sklearn.pipeline import Pipeline\n",
+    "\n",
+    "df = pd.read_csv('https://github.com/jnin/information-systems/raw/main/data/compas_ai2.csv')\n",
+    "\n",
+    "df['Severity'] = df['DecileScore'] > df['DecileScore'].median()\n",
+    "df.drop(columns = ['DecileScore'], inplace=True)\n",
+    "\n",
+    "X = df.drop(columns=[\"Severity\"])\n",
+    "y = df['Severity']\n",
+    "\n",
+    "numerical_features = ['YearOfBirth']\n",
+    "categorical_features = ['Agency','Gender','Ethnic','ScaleSet','LegalStatus','CustodyStatus','MaritalStatus','DisplayText']\n",
+    "transformer = ColumnTransformer([('categorical_transformations', OneHotEncoder(sparse=False), categorical_features),\n",
+    "                                ('numerical_transformations', KBinsDiscretizer(encode='ordinal'), numerical_features)], \n",
+    "                                remainder='passthrough')\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>Agency</th>\n",
+       "      <th>Gender</th>\n",
+       "      <th>Ethnic</th>\n",
+       "      <th>YearOfBirth</th>\n",
+       "      <th>ScaleSet</th>\n",
+       "      <th>LegalStatus</th>\n",
+       "      <th>CustodyStatus</th>\n",
+       "      <th>MaritalStatus</th>\n",
+       "      <th>RecSupervisionLevel</th>\n",
+       "      <th>DisplayText</th>\n",
+       "      <th>Severity</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>PRETRIAL</td>\n",
+       "      <td>Male</td>\n",
+       "      <td>Caucasian</td>\n",
+       "      <td>1992</td>\n",
+       "      <td>Risk and Prescreen</td>\n",
+       "      <td>Pretrial</td>\n",
+       "      <td>Jail Inmate</td>\n",
+       "      <td>Single</td>\n",
+       "      <td>1</td>\n",
+       "      <td>Risk of Violence</td>\n",
+       "      <td>True</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>PRETRIAL</td>\n",
+       "      <td>Male</td>\n",
+       "      <td>Caucasian</td>\n",
+       "      <td>1992</td>\n",
+       "      <td>Risk and Prescreen</td>\n",
+       "      <td>Pretrial</td>\n",
+       "      <td>Jail Inmate</td>\n",
+       "      <td>Single</td>\n",
+       "      <td>1</td>\n",
+       "      <td>Risk of Recidivism</td>\n",
+       "      <td>False</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>PRETRIAL</td>\n",
+       "      <td>Male</td>\n",
+       "      <td>Caucasian</td>\n",
+       "      <td>1992</td>\n",
+       "      <td>Risk and Prescreen</td>\n",
+       "      <td>Pretrial</td>\n",
+       "      <td>Jail Inmate</td>\n",
+       "      <td>Single</td>\n",
+       "      <td>1</td>\n",
+       "      <td>Risk of Failure to Appear</td>\n",
+       "      <td>False</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>PRETRIAL</td>\n",
+       "      <td>Male</td>\n",
+       "      <td>Caucasian</td>\n",
+       "      <td>1984</td>\n",
+       "      <td>Risk and Prescreen</td>\n",
+       "      <td>Pretrial</td>\n",
+       "      <td>Jail Inmate</td>\n",
+       "      <td>Married</td>\n",
+       "      <td>1</td>\n",
+       "      <td>Risk of Violence</td>\n",
+       "      <td>False</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>PRETRIAL</td>\n",
+       "      <td>Male</td>\n",
+       "      <td>Caucasian</td>\n",
+       "      <td>1984</td>\n",
+       "      <td>Risk and Prescreen</td>\n",
+       "      <td>Pretrial</td>\n",
+       "      <td>Jail Inmate</td>\n",
+       "      <td>Married</td>\n",
+       "      <td>1</td>\n",
+       "      <td>Risk of Recidivism</td>\n",
+       "      <td>False</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>...</th>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "      <td>...</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>60793</th>\n",
+       "      <td>Probation</td>\n",
+       "      <td>Male</td>\n",
+       "      <td>African-American</td>\n",
+       "      <td>1964</td>\n",
+       "      <td>Risk and Prescreen</td>\n",
+       "      <td>Pretrial</td>\n",
+       "      <td>Jail Inmate</td>\n",
+       "      <td>Single</td>\n",
+       "      <td>3</td>\n",
+       "      <td>Risk of Recidivism</td>\n",
+       "      <td>True</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>60794</th>\n",
+       "      <td>Probation</td>\n",
+       "      <td>Male</td>\n",
+       "      <td>African-American</td>\n",
+       "      <td>1964</td>\n",
+       "      <td>Risk and Prescreen</td>\n",
+       "      <td>Pretrial</td>\n",
+       "      <td>Jail Inmate</td>\n",
+       "      <td>Single</td>\n",
+       "      <td>3</td>\n",
+       "      <td>Risk of Failure to Appear</td>\n",
+       "      <td>True</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>60795</th>\n",
+       "      <td>PRETRIAL</td>\n",
+       "      <td>Male</td>\n",
+       "      <td>Caucasian</td>\n",
+       "      <td>1985</td>\n",
+       "      <td>Risk and Prescreen</td>\n",
+       "      <td>Pretrial</td>\n",
+       "      <td>Jail Inmate</td>\n",
+       "      <td>Single</td>\n",
+       "      <td>1</td>\n",
+       "      <td>Risk of Violence</td>\n",
+       "      <td>False</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>60796</th>\n",
+       "      <td>PRETRIAL</td>\n",
+       "      <td>Male</td>\n",
+       "      <td>Caucasian</td>\n",
+       "      <td>1985</td>\n",
+       "      <td>Risk and Prescreen</td>\n",
+       "      <td>Pretrial</td>\n",
+       "      <td>Jail Inmate</td>\n",
+       "      <td>Single</td>\n",
+       "      <td>1</td>\n",
+       "      <td>Risk of Recidivism</td>\n",
+       "      <td>True</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>60797</th>\n",
+       "      <td>PRETRIAL</td>\n",
+       "      <td>Male</td>\n",
+       "      <td>Caucasian</td>\n",
+       "      <td>1985</td>\n",
+       "      <td>Risk and Prescreen</td>\n",
+       "      <td>Pretrial</td>\n",
+       "      <td>Jail Inmate</td>\n",
+       "      <td>Single</td>\n",
+       "      <td>1</td>\n",
+       "      <td>Risk of Failure to Appear</td>\n",
+       "      <td>False</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "<p>60798 rows × 11 columns</p>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "          Agency Gender            Ethnic  YearOfBirth            ScaleSet  \\\n",
+       "0       PRETRIAL   Male         Caucasian         1992  Risk and Prescreen   \n",
+       "1       PRETRIAL   Male         Caucasian         1992  Risk and Prescreen   \n",
+       "2       PRETRIAL   Male         Caucasian         1992  Risk and Prescreen   \n",
+       "3       PRETRIAL   Male         Caucasian         1984  Risk and Prescreen   \n",
+       "4       PRETRIAL   Male         Caucasian         1984  Risk and Prescreen   \n",
+       "...          ...    ...               ...          ...                 ...   \n",
+       "60793  Probation   Male  African-American         1964  Risk and Prescreen   \n",
+       "60794  Probation   Male  African-American         1964  Risk and Prescreen   \n",
+       "60795   PRETRIAL   Male         Caucasian         1985  Risk and Prescreen   \n",
+       "60796   PRETRIAL   Male         Caucasian         1985  Risk and Prescreen   \n",
+       "60797   PRETRIAL   Male         Caucasian         1985  Risk and Prescreen   \n",
+       "\n",
+       "      LegalStatus CustodyStatus MaritalStatus  RecSupervisionLevel  \\\n",
+       "0        Pretrial   Jail Inmate        Single                    1   \n",
+       "1        Pretrial   Jail Inmate        Single                    1   \n",
+       "2        Pretrial   Jail Inmate        Single                    1   \n",
+       "3        Pretrial   Jail Inmate       Married                    1   \n",
+       "4        Pretrial   Jail Inmate       Married                    1   \n",
+       "...           ...           ...           ...                  ...   \n",
+       "60793    Pretrial   Jail Inmate        Single                    3   \n",
+       "60794    Pretrial   Jail Inmate        Single                    3   \n",
+       "60795    Pretrial   Jail Inmate        Single                    1   \n",
+       "60796    Pretrial   Jail Inmate        Single                    1   \n",
+       "60797    Pretrial   Jail Inmate        Single                    1   \n",
+       "\n",
+       "                     DisplayText  Severity  \n",
+       "0               Risk of Violence      True  \n",
+       "1             Risk of Recidivism     False  \n",
+       "2      Risk of Failure to Appear     False  \n",
+       "3               Risk of Violence     False  \n",
+       "4             Risk of Recidivism     False  \n",
+       "...                          ...       ...  \n",
+       "60793         Risk of Recidivism      True  \n",
+       "60794  Risk of Failure to Appear      True  \n",
+       "60795           Risk of Violence     False  \n",
+       "60796         Risk of Recidivism      True  \n",
+       "60797  Risk of Failure to Appear     False  \n",
+       "\n",
+       "[60798 rows x 11 columns]"
+      ]
+     },
+     "execution_count": 5,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "df"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "markdown",
+     "checksum": "f66e73733d304e09c697558e62ad1bc4",
+     "grade": false,
+     "grade_id": "cell-28cb28fcd738753e",
+     "locked": true,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "source": [
+    "<div class=\"alert alert-info\"><b>Exercise 1</b>\n",
+    "\n",
+    "Create a Scikit-learn pipeline containing the ```transformer``` object, a ```StandardScaler``` normalization and ```XGBClassifier``` model. You have all the documentation of this classifier in the following [link](https://xgboost.readthedocs.io/en/stable/python/python_api.html). To integrate this classifier inside a Scikit-learn pipeline it is necessary to provide these two parameters:\n",
+    "\n",
+    "- ```use_label_encoder=False```\n",
+    "- ```disable_default_eval_metric=True```\n",
+    "\n",
+    "The first one disables the auto-encodeing functions of the XGBClassifier. Then, you can use the label encoder from Scikit-learn. The second one disables the evaluation metrics of the XGBClassifier and allows you to use the Scikit-learn performance evaluation metrics. \n",
+    "    \n",
+    "<br><i>[1 point]</i>\n",
+    "</div>\n",
+    "\n",
+    "<div class=\"alert alert-warning\">\n",
+    "    \n",
+    "Execute the following cell to install the xgboost library in your notebook. You only need to execute the cell once.\n",
+    "</div>"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "141c0bd96767c2ed12955b177381c10e",
+     "grade": false,
+     "grade_id": "cell-9e16c4dcd79695ca",
+     "locked": true,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "^C\n",
+      "\n",
+      "CondaError: KeyboardInterrupt\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Install a conda package in the current Jupyter kernel\n",
+    "import sys\n",
+    "!conda install --yes --prefix {sys.prefix} xgboost"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "metadata": {
+    "deletable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "464b46bfc7068466a8f6196289ff7a42",
+     "grade": false,
+     "grade_id": "ex1",
+     "locked": false,
+     "schema_version": 3,
+     "solution": true,
+     "task": false
+    }
+   },
+   "outputs": [],
+   "source": [
+    "# YOUR CODE HERE\n",
+    "\n",
+    "from sklearn.preprocessing import StandardScaler\n",
+    "from xgboost import XGBClassifier\n",
+    "\n",
+    "steps = [\n",
+    "  ('transformer', transformer),\n",
+    "  ('scaler', StandardScaler()), \n",
+    "    #disable_default_eval_metric=1 instead of =True otherwise gives error -> TRY AND SEE\n",
+    "  ('xgb', XGBClassifier(use_label_encoder=False, disable_default_eval_metric=1))]\n",
+    "\n",
+    "pipe = Pipeline(steps)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "68ecdd3b3d805baa5acee240c7c43b34",
+     "grade": true,
+     "grade_id": "test1_1",
+     "locked": true,
+     "points": 0.25,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "outputs": [],
+   "source": [
+    "# LEAVE BLANK"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "52885fcba97b2dc1b6f18131fde36661",
+     "grade": true,
+     "grade_id": "test1_2",
+     "locked": true,
+     "points": 0.25,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "outputs": [],
+   "source": [
+    "# LEAVE BLANK"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "724126d0efeab1f166b193eb00ee158b",
+     "grade": true,
+     "grade_id": "test1_3",
+     "locked": true,
+     "points": 0.5,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "outputs": [],
+   "source": [
+    "# LEAVE BLANK"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "markdown",
+     "checksum": "50e38a2e10c61df007f735f7de2d388d",
+     "grade": false,
+     "grade_id": "cell-c42bac26411f4fd3",
+     "locked": true,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "source": [
+    "<div class=\"alert alert-info\"><b>Exercise 2 </b> \n",
+    "    \n",
+    "Write the code to split ```X``` and ```y``` into separate training and test sets with the relative size of 0.9 and 0.1. Store the training and tests feature matrix in variables called ```X_train``` and ```X_test```, and the training and test label arrays as ```y_train``` and ```y_test```.  Set the parameter ```random_state=42``` when creating the train test split to ensure reproducibility.\n",
+    "\n",
+    "Later complete the function ```cross_validation_compas``` with the code to estimate the average performance of your model using cross-validation with **five** stratified folds using the ```roc_auc``` score. ```cross_validation_compas``` takes three parameters: a SciKit-learn pipeline  ```compas_pipe```, a feature matrix ```X_train``` and a target array ```y_train``` and returns the obtained mean score as a float number\n",
+    "    \n",
+    "<i>[1 point]</i>\n",
+    "</div>"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "metadata": {
+    "deletable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "7a8f80020d7e313c5cdf66f9213a5a8b",
+     "grade": false,
+     "grade_id": "ex2",
+     "locked": false,
+     "schema_version": 3,
+     "solution": true,
+     "task": false
+    }
+   },
+   "outputs": [],
+   "source": [
+    "# YOUR CODE HERE\n",
+    "#Split into training and test sets with relative size of 0.9 and 0.1\n",
+    "#from sklearn.model_selection import cross_val_score #############\n",
+    "\n",
+    "from sklearn.model_selection import train_test_split\n",
+    "X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.1, random_state = 42)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def cross_validation_compas(compas_pipe, X_train, y_train):\n",
+    "# YOUR CODE HERE\n",
+    "        \n",
+    "    score = cross_val_score(compas_pipe, X_train, y_train, cv = 5, scoring='roc_auc').mean()\n",
+    "    \n",
+    "    return(float(score))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "dce4ce98b9aa0e83a8639da4e094c460",
+     "grade": true,
+     "grade_id": "test2_1",
+     "locked": true,
+     "points": 0.25,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "outputs": [],
+   "source": [
+    "# LEAVE BLANK"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "1475602122f5703ca985c52402000b8d",
+     "grade": true,
+     "grade_id": "test2_2",
+     "locked": true,
+     "points": 0.25,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "outputs": [],
+   "source": [
+    "# LEAVE BLANK"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "30fe3e5887b244d5c37b0c20d8c94a7f",
+     "grade": true,
+     "grade_id": "test2_3",
+     "locked": true,
+     "points": 0.25,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "outputs": [],
+   "source": [
+    "# LEAVE BLANK"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "d82352b77c672e91d9832f1b345a05db",
+     "grade": true,
+     "grade_id": "test2_4",
+     "locked": true,
+     "points": 0.25,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "outputs": [],
+   "source": [
+    "# LEAVE BLANK"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "markdown",
+     "checksum": "81d7775ed0477e6fd40b3fe1e23e6078",
+     "grade": false,
+     "grade_id": "cell-f0277fd8db4aa9a1",
+     "locked": true,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "source": [
+    "<div class=\"alert alert-info\"><b>Exercise 3 </b> \n",
+    "    \n",
+    "Complete the function ```grid_search_compas``` to create the ```GridSearchCV``` object and fit it. The function must return the best ```roc_auc``` score and the grid object (two different elements). Assume the ```parameters``` variable contains the parameters you want to explore. When creating the ```GridSearchCV``` set the parameter ```return_train_score=True```. This option is necessary to execute the exercise 5 code correctly. This option stores the training score values inside the ``` GridSearchCV``` object.\n",
+    "    \n",
+    "<i>[2.5 points]</i>\n",
+    "</div>\n",
+    "\n",
+    "<div class=\"alert alert-warning\">\n",
+    "    \n",
+    "You will set the variable ```parameters``` in exercise 4.\n",
+    "</div>"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "metadata": {
+    "deletable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "22dfbf9098eda2a435e5f88c2f242e66",
+     "grade": false,
+     "grade_id": "ex3",
+     "locked": false,
+     "schema_version": 3,
+     "solution": true,
+     "task": false
+    }
+   },
+   "outputs": [],
+   "source": [
+    "from sklearn.model_selection import GridSearchCV\n",
+    "\n",
+    "def grid_search_compas(compas_pipe, parameters, X_train, X_test, y_train, y_test):\n",
+    "    # YOUR CODE HERE\n",
+    "    \n",
+    "    CV_GS = GridSearchCV(compas_pipe, parameters, cv = 5, return_train_score=True)\n",
+    "    CV_GS.fit(X_train, y_train)\n",
+    "    \n",
+    "    \n",
+    "    best_roc_auc_score = CV_GS.score(X_test,y_test)\n",
+    "    \n",
+    "    return(best_roc_auc_score, CV_GS)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 18,
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "37ed832abe675bdaa5941f4c67bc3493",
+     "grade": true,
+     "grade_id": "test3_1",
+     "locked": true,
+     "points": 0.5,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "outputs": [],
+   "source": [
+    "# LEAVE BLANK"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 19,
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "54c62fef65b65176d73e1a036336cbc3",
+     "grade": true,
+     "grade_id": "test3_2",
+     "locked": true,
+     "points": 1,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "outputs": [],
+   "source": [
+    "# LEAVE BLANK"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 20,
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "767a4c3bd0cc564082800f66a39149a9",
+     "grade": true,
+     "grade_id": "test3_3",
+     "locked": true,
+     "points": 1,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "outputs": [],
+   "source": [
+    "# LEAVE BLANK"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "markdown",
+     "checksum": "3a94de3cc992003d91dc4e96e9ecaf53",
+     "grade": false,
+     "grade_id": "cell-546db5f191068e6f",
+     "locked": true,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "source": [
+    "<div class=\"alert alert-info\"><b>Exercise 4 </b> \n",
+    "\n",
+    "Write the code to define the variable ```parameters``` with two entries ```max_depth``` and ```n_estimators``` with values ```[2, 6, 20]``` and ```[10, 100]``` respectively. Then execute the ```grid_search_compas``` function and store the returned values in two variables called ```score``` and ```grid``` respectively.\n",
+    "\n",
+    "<i>[1.5 points]</i>\n",
+    "</div>"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 21,
+   "metadata": {
+    "deletable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "00ef2091bcd0c6ccc4ed66e901f1fff9",
+     "grade": false,
+     "grade_id": "ex4",
+     "locked": false,
+     "schema_version": 3,
+     "solution": true,
+     "task": false
+    }
+   },
+   "outputs": [],
+   "source": [
+    "# YOUR CODE HERE\n",
+    "parameters = {'xgb__max_depth' : [2, 6, 20],\n",
+    "              'xgb__n_estimators' : [10, 100]\n",
+    "             }\n",
+    "\n",
+    "score, grid = grid_search_compas(pipe, parameters, X_train, X_test, y_train, y_test)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 22,
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "221a7e4361e6fb269a2d90306ab79b5c",
+     "grade": true,
+     "grade_id": "tes4_2",
+     "locked": true,
+     "points": 0.5,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "outputs": [],
+   "source": [
+    "# LEAVE BLANK"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 23,
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "554516e66d5e12774eda9ba297e0e38d",
+     "grade": true,
+     "grade_id": "tes4_3",
+     "locked": true,
+     "points": 0.5,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "outputs": [],
+   "source": [
+    "# LEAVE BLANK"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 24,
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "a4d51413e9d0fb2036cae8cccd20fbc3",
+     "grade": true,
+     "grade_id": "tes4_4",
+     "locked": true,
+     "points": 0.5,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "outputs": [],
+   "source": [
+    "# LEAVE BLANK"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "markdown",
+     "checksum": "b850f35b23a98d582c43fa2bbbcd0d93",
+     "grade": false,
+     "grade_id": "cell-3a2200b433731798",
+     "locked": true,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "source": [
+    "<div class=\"alert alert-info\"><b>Exercise 5 </b> \n",
+    "    \n",
+    "Execute the following cell. The cell will only work if exercise 4 stores the grid search outputs inside the correct variables. In the light of the printed metrics, what can you say about the screened parameters?. How both parameters affect the ```roc_auc``` values.\n",
+    "    \n",
+    "<i>[2.5 points]</i>\n",
+    "</div>\n",
+    "\n",
+    "<div class='alert alert-warning'>\n",
+    "\n",
+    "In this exercise, it is not mandatory to write any code. Use your own words to describe if you detect any problem when the model is fitted with the different values of both parameters.\n",
+    "</div>\n",
+    "\n",
+    "<div class='alert alert-warning'>\n",
+    "    \n",
+    "We executed the cell below with a different random number. Its output is displayed as an illustrative purpose if you did not answer exercise 4. The roc_auc values are similar but not identical to using`the random_number = 42 parameter.\n",
+    "</div>"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 25,
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "ed2eb8c03826ed33dc78c77c07a36d3d",
+     "grade": false,
+     "grade_id": "cell-cec3926ea824aabd",
+     "locked": true,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>max_depth</th>\n",
+       "      <th>n_estimators</th>\n",
+       "      <th>mean_train_score</th>\n",
+       "      <th>mean_test_score</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>2</td>\n",
+       "      <td>10</td>\n",
+       "      <td>0.855047</td>\n",
+       "      <td>0.854971</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>2</td>\n",
+       "      <td>100</td>\n",
+       "      <td>0.887327</td>\n",
+       "      <td>0.886245</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>6</td>\n",
+       "      <td>10</td>\n",
+       "      <td>0.900225</td>\n",
+       "      <td>0.896870</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>6</td>\n",
+       "      <td>100</td>\n",
+       "      <td>0.910929</td>\n",
+       "      <td>0.896817</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>20</td>\n",
+       "      <td>10</td>\n",
+       "      <td>0.917894</td>\n",
+       "      <td>0.890808</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>5</th>\n",
+       "      <td>20</td>\n",
+       "      <td>100</td>\n",
+       "      <td>0.927409</td>\n",
+       "      <td>0.882905</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "   max_depth  n_estimators  mean_train_score  mean_test_score\n",
+       "0          2            10          0.855047         0.854971\n",
+       "1          2           100          0.887327         0.886245\n",
+       "2          6            10          0.900225         0.896870\n",
+       "3          6           100          0.910929         0.896817\n",
+       "4         20            10          0.917894         0.890808\n",
+       "5         20           100          0.927409         0.882905"
+      ]
+     },
+     "execution_count": 25,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "pd.DataFrame({\n",
+    "     'max_depth': {0: 2, 1: 2, 2: 6, 3: 6, 4: 20, 5: 20},\n",
+    "     'n_estimators': {0: 10, 1: 100, 2: 10, 3: 100, 4: 10, 5: 100},\n",
+    "     'mean_train_score': {0: 0.8550474223586788,\n",
+    "                          1: 0.8873265879037542,\n",
+    "                          2: 0.9002253881327207,\n",
+    "                          3: 0.910929370639835,\n",
+    "                          4: 0.9178935505438173,\n",
+    "                          5: 0.9274086768755755},\n",
+    "     'mean_test_score':  {0: 0.8549714902093231,\n",
+    "                          1: 0.8862446860845479,\n",
+    "                          2: 0.8968701337253802,\n",
+    "                          3: 0.8968171100368609,\n",
+    "                          4: 0.8908078571115927,\n",
+    "                          5: 0.8829054959715282}})"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 26,
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "073ce749274cc4ecfad425e9b78555aa",
+     "grade": false,
+     "grade_id": "cell-08a87608c8dd437c",
+     "locked": true,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>xgb__max_depth</th>\n",
+       "      <th>xgb__n_estimators</th>\n",
+       "      <th>mean_train_score</th>\n",
+       "      <th>mean_test_score</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>2</td>\n",
+       "      <td>10</td>\n",
+       "      <td>0.785171</td>\n",
+       "      <td>0.785171</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>2</td>\n",
+       "      <td>100</td>\n",
+       "      <td>0.808957</td>\n",
+       "      <td>0.808984</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>6</td>\n",
+       "      <td>10</td>\n",
+       "      <td>0.832350</td>\n",
+       "      <td>0.831664</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>6</td>\n",
+       "      <td>100</td>\n",
+       "      <td>0.837270</td>\n",
+       "      <td>0.832395</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>20</td>\n",
+       "      <td>10</td>\n",
+       "      <td>0.844128</td>\n",
+       "      <td>0.827662</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>5</th>\n",
+       "      <td>20</td>\n",
+       "      <td>100</td>\n",
+       "      <td>0.853883</td>\n",
+       "      <td>0.825779</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "   xgb__max_depth  xgb__n_estimators  mean_train_score  mean_test_score\n",
+       "0               2                 10          0.785171         0.785171\n",
+       "1               2                100          0.808957         0.808984\n",
+       "2               6                 10          0.832350         0.831664\n",
+       "3               6                100          0.837270         0.832395\n",
+       "4              20                 10          0.844128         0.827662\n",
+       "5              20                100          0.853883         0.825779"
+      ]
+     },
+     "execution_count": 26,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "cv_results = pd.DataFrame(grid.cv_results_)\n",
+    "cv_results = pd.concat((cv_results['params'].apply(pd.Series), cv_results[['mean_train_score', 'mean_test_score']]), axis=1)\n",
+    "cv_results"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "deletable": false,
+    "nbgrader": {
+     "cell_type": "markdown",
+     "checksum": "713571d9f64a3f9ef33901ff5dba22ca",
+     "grade": true,
+     "grade_id": "ex5",
+     "locked": false,
+     "points": 2.5,
+     "schema_version": 3,
+     "solution": true,
+     "task": false
+    }
+   },
+   "source": [
+    "YOUR ANSWER HERE\n",
+    "\n",
+    "In the above table we may identify 3 scenarios (based on xgb__max_depth), each of which can be divided in two instances (based on xgb__n_estimators).\n",
+    "\n",
+    "1. max_depth = 2 \n",
+    "    n_estimators = 10 - scores are equal for train and test, with a value of 0.78\n",
+    "    n_estimators = 100 - increasing the number of estimator only sightly improves both train and test metrics, more specifically an increase of around 3%\n",
+    "\n",
+    "2. max_depth = 6 - by tripling the maximum depth of the decision tree, the performance scores increase significantly to 0.83\n",
+    "    n_estimators = 10 & n_estimators = 100 - scores are equal, irrespective of the number of estimators used in the model\n",
+    "\n",
+    "3. max_depth = 20 - by substiantially increasing the maximum depth, the train score only slightly improves and the test score actually decreases\n",
+    "    n_estimators = 10 - having a high maximum depth with only few estimators does not improve the model significantly, it might not be worth it\n",
+    "    n_estimators = 100 - increasing significantly the number of estiators improves the train scores, by 2%, but not the test score.\n",
+    "\n",
+    "    \n",
+    "Bottom line: All in all, it might be worth it keeping the maximum depth moderate around 6. All else being equal, the number of estimators only improves a model either with low maximum depth (i.e., 2) or a very large one (i.e., 20)."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "markdown",
+     "checksum": "15434f23cb947abb3b996517daf140ba",
+     "grade": false,
+     "grade_id": "cell-a525253e234aaea4",
+     "locked": true,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "source": [
+    "<div class=\"alert alert-info\"><b>Exercise 6 </b> \n",
+    "    \n",
+    "Write the code to modify the data preprocessing pipeline. To do this, add additional values for the number of bins inside the ```KBinsDiscretizer``` step. Specifically include ```[2, 20]``` as values for the ```n_bins``` parameter of the ```KBinsDiscretizer``` in ```parameters```.\n",
+    "    \n",
+    "Execute again the funtion ```grid_search_compas```. This time save the returning store the returned values in two variables called ```score_pre``` and ```grid_pre``` respectively.\n",
+    "    \n",
+    "<i>[1.5 points]</i>\n",
+    "</div>\n",
+    "\n",
+    "<div class='alert alert-warning'>\n",
+    "\n",
+    "Remember SciKit-learn pipelines have a hierarchic structure. You can nest two identification strings using this format ```externalID__internalID__parameter```.\n",
+    "</div>"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 27,
+   "metadata": {
+    "deletable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "b682cd9ae8f5c98ab8c9a1eed20998e8",
+     "grade": false,
+     "grade_id": "ex6",
+     "locked": false,
+     "schema_version": 3,
+     "solution": true,
+     "task": false
+    }
+   },
+   "outputs": [],
+   "source": [
+    "# YOUR CODE HERE\n",
+    "\n",
+    "\n",
+    "#transformerID__KBinsDiscretizerID__parameter\n",
+    "\n",
+    "\n",
+    "#Transformer, probably unnecessary\n",
+    "transformer = ColumnTransformer([('categorical_transformations', OneHotEncoder(sparse=False), categorical_features),\n",
+    "                                ('numerical_transformations', KBinsDiscretizer(encode='ordinal'), numerical_features)], \n",
+    "                                remainder='passthrough')\n",
+    "\n",
+    "#Define steps for pipeline\n",
+    "steps = [\n",
+    "  ('transformer', transformer),\n",
+    "  ('scaler', StandardScaler()),\n",
+    "  ('xgb', XGBClassifier(use_label_encoder=False, disable_default_eval_metric=1))]\n",
+    "\n",
+    "#Modified parameters\n",
+    "parameters = {'xgb__max_depth' : [2, 6, 20],\n",
+    "              'xgb__n_estimators' : [10, 100],\n",
+    "              'transformer__numerical_transformations__n_bins' : [2, 20]}\n",
+    "\n",
+    "#Define pipeline\n",
+    "pipe = Pipeline(steps)\n",
+    "\n",
+    "#Execute grid_search_compas again\n",
+    "score_pre, grid_pre = grid_search_compas(pipe, parameters, X_train, X_test, y_train, y_test)\n",
+    "#print(score_pre, grid_pre)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 28,
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "1f5fca22d2de320e3352ebd2ba6c9da0",
+     "grade": true,
+     "grade_id": "test6_1",
+     "locked": true,
+     "points": 0.25,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "outputs": [],
+   "source": [
+    "# LEAVE BLANK"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 29,
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "de8cdf390848eb8b6f1b23bbf41eb781",
+     "grade": true,
+     "grade_id": "test6_2",
+     "locked": true,
+     "points": 0.5,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "outputs": [],
+   "source": [
+    "# LEAVE BLANK"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 30,
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "3280e5820b94f857e461aeccaefda5d6",
+     "grade": true,
+     "grade_id": "test6_4",
+     "locked": true,
+     "points": 0.25,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "outputs": [],
+   "source": [
+    "# LEAVE BLANK"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 31,
+   "metadata": {
+    "deletable": false,
+    "editable": false,
+    "nbgrader": {
+     "cell_type": "code",
+     "checksum": "6fd259313e3f1a15a72c0abae90dd3c2",
+     "grade": true,
+     "grade_id": "test6_5",
+     "locked": true,
+     "points": 0.5,
+     "schema_version": 3,
+     "solution": false,
+     "task": false
+    }
+   },
+   "outputs": [],
+   "source": [
+    "# LEAVE BLANK"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "colab": {
+   "collapsed_sections": [],
+   "name": "Session I.ipynb",
+   "provenance": []
+  },
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.7.6"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}
